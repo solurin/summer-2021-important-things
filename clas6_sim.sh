@@ -1,12 +1,12 @@
 #!/bin/bash
-export CLAS_PARMS=/data/parms
+export CLAS_PARMS=/group/clas/parms
 export ROOTSYS=/usr/local/root
 export MYSQLINC=/usr/include/mysql
 export MYSQLLIB=/usr/lib64/mysql
 export CLAS6=/usr/local/clas-software/build
 export PATH=$CLAS6/bin:$PATH
 export CERN=/usr/local/cernlib/x86_64_rhel6
-export CERN_LEVEL=2005/bin
+export CERN_LEVEL=2005
 export CERN_ROOT=$CERN/$CERN_LEVEL
 export CVSCOSRC=$CERN/$CERN_LEVEL/src
 export PATH=$CERN/$CERN_LEVEL/src:$PATH
@@ -24,11 +24,11 @@ source $ROOTSYS/bin/thisroot.sh
 
 export CLAS_CALDB_PASS=""
 export CLAS_CALDB_RUNINDEX="RunIndex"
-export RECSIS_RUNTIME="${PWD}/recsis"
-mkdir -p ${RECSIS_RUNTIME}
+export RECSIS_RUNTIME="/group/clas/parms/recsis"
+#mkdir -p ${RECSIS_RUNTIME}
 
 tar -xvf parms.tar.gz
-export CLAS_PARMS=${PWD}/parms
+export CLAS_PARMS=/group/clas/parms
 
 export CLAS_CALDB_HOST=clasdb.jlab.org
 export CLAS_CALDB_USER=clasreader
@@ -74,6 +74,8 @@ elif [[ $1 == "Pb" ]]
 		export tarA=207
 		export tarVG2=2
 		export tarZ=82
+else
+	return 0
 fi
 
 sed -i "s/TGTP/TGTP ${tarA}/g"    ${ffreadfile}
@@ -88,11 +90,6 @@ ${LEPTO_EXE}/lepto.exe | ${LEPTO_PL} | ${TXT2PART}/txt2part -o${LEPTO_MATERIAL} 
 
 
 
-
-
-
-
-
 # echoerr "============ end lepto ============"
 
 export CLAS_CALDB_DBNAME=calib
@@ -103,14 +100,26 @@ gsim_bat -nomcdata -ffread ${ffreadfile} -mcin ${LEPTO_MATERIAL} -bosout gsim.bo
 echoerr "============ end gsim_bat ============"
 
 echoerr "============ start gpp ============"
-gpp -ogppD.A00 -a2.35 -b2.35 -c2.35 -f0.97 -P0x1b -R23500 gsim.bos
+gpp -ogpp$1.A00 -a2.35 -b2.35 -c2.35 -f0.97 -P0x1b -R23500 gsim.bos
  #gpp -ouncooked.bos -R23500 gsim.bos
 echoerr "============ end gpp ============"
 
-# echoerr "============ start user_ana ============"
+cp /group/clas/parms/recsis/recsis_eg2.tcl recsis$1.tcl
+export tclfile=recsis$1.tcl
+export rechbook=recsis$1.hbook
+export reclogfile=recsis$1.log
+export recbosfile=recsis$1.A00
+
+echoerr "============ start user_ana ============"
+sed -i "s|inputfile|inputfile gpp$1.A00;|g" ${tclfile}
+sed -i "s|setc chist_filename|setc chist_filename ${rechbook};|g" ${tclfile}
+sed -i "s|setc log_file_name|setc log_file_name ${reclogfile};|g" ${tclfile}
+sed -i "s|outputfile|outputfile ${recbosfile} PROC1 2047;|g"      ${tclfile}
+sed -i "s|set TargetPos(3)|set TargetPos(3) ${tarZpos};|g"        ${tclfile}
+sed -i "s|go|go ${Nevts};|g"                                      ${tclfile}
 #user_ana -t user_ana.tcl
-user_ana -t recsisD.tcl | grep -v HFITGA | grep -v HFITH | grep -v HFNT
-# echoerr "============ end user_ana ============"
+user_ana -t ${tclfile} | grep -v HFITGA | grep -v HFITH | grep -v HFNT
+echoerr "============ end user_ana ============"
 
 # h10maker -rpm cooked.bos all.root
 
